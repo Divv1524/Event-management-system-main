@@ -25,12 +25,14 @@ export const registerForEvent = async (req, res) => {
       });
     }
 
-    // Capacity check
-    const registrationCount = await Registration.countDocuments({
-      event: event._id
-    });
+    // Atomic capacity check - increment registeredCount only if under capacity
+    const updatedEvent = await Event.findOneAndUpdate(
+      { _id: event._id, $expr: { $lt: ['$registeredCount', '$capacity'] } },
+      { $inc: { registeredCount: 1 } },
+      { new: true }
+    );
 
-    if (registrationCount >= event.capacity) {
+    if (!updatedEvent) {
       return res.status(409).json({
         message: 'Event capacity reached'
       });
