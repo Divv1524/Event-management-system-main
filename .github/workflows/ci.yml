@@ -133,6 +133,10 @@ jobs:
         working-directory: Frontendd
         run: npm ci
 
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
       # ── 4. Run ESLint on the frontend ────────────────────────────────────────
       # The frontend already has eslint configured (eslint.config.js + scripts.lint).
       # This catches: React hooks violations, undefined variables, import errors.
@@ -201,3 +205,9 @@ jobs:
       - name: Run Playwright tests
         working-directory: Frontendd
         run: npx playwright test
+        env:
+          JWT_SECRET: "test-secret-key-for-ci"
+          MONGO_URI: "mongodb://127.0.0.1:27017/event_mgmt_test"
+          PORT: "5050"
+          NODE_ENV: "test"
+          CLIENT_URL: "http://localhost:5173"

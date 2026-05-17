@@ -27,7 +27,7 @@ export default function AdminDashboard() {
             fetchUsers();
         }
         fetchStats();
-    }, [activeTab]);
+        }, [activeTab, fetchPendingEvents, fetchAllEvents, fetchUsers, fetchStats]);
 
     const fetchPendingEvents = async () => {
         try {
