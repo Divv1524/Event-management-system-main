@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Ticket, X, Download, Search } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -21,6 +21,7 @@ const [loading, setLoading] = useState(true);
 const [activeTab, setActiveTab] = useState('Upcoming Tickets');
 const [selectedTicket, setSelectedTicket] = useState(null);
 const ticketRef = useRef(null);
+const mountedRef = useRef(true);
 const navigate = useNavigate();
 
 const [searchParams, setSearchParams] = useSearchParams();
@@ -37,7 +38,7 @@ const [selectedCategory, setSelectedCategory] = useState(
     searchParams.get('category') || ''
 );
 const [isFetching, setIsFetching] = useState(false);  
-
+useEffect(() => () => (mountedRef.current = false), []);
 //  debounced value — API only fires 400ms after user stops typing 
 const debouncedSearch = useDebounce(searchQuery, 400);
 

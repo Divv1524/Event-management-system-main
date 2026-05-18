@@ -115,15 +115,23 @@ export const deleteEvent = async (req, res) => {
     });
   }
 };
-
 export const listEvents = async (req, res) => {
   try {
-    const { q, category, status, organizer, tags, page = 1, limit = 12 } = req.query;
+    const {
+      q,
+      category,
+      status,
+      organizer,
+      tags,
+      page = 1,
+      limit = 12,
+    } = req.query;
 
     const filter = {
       status: 'approved',
     };
 
+    // Search title + description
     if (q) {
       filter.$or = [
         { title: { $regex: q, $options: 'i' } },
@@ -140,6 +148,7 @@ export const listEvents = async (req, res) => {
         .split(',')
         .map((tag) => tag.toLowerCase().trim())
         .filter(Boolean);
+
       filter.tags = { $all: tagArray };
     }
 
@@ -149,6 +158,7 @@ export const listEvents = async (req, res) => {
       50,
       Math.max(1, parseInt(limit, 10) || 12)
     );
+
     const skip = (pageNum - 1) * limitNum;
 
     const [events, total] = await Promise.all([
@@ -157,6 +167,7 @@ export const listEvents = async (req, res) => {
         .sort({ date: 1 })
         .skip(skip)
         .limit(limitNum),
+
       Event.countDocuments(filter),
     ]);
 
@@ -171,7 +182,46 @@ export const listEvents = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+export const getPopularTags = async (req, res) => {
+  try {
+    const tags = await Event.aggregate([
+      {
+        $match: {
+          status: 'approved',
+        },
+      },
+      {
+        $unwind: '$tags',
+      },
+      {
+        $group: {
+          _id: '$tags',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+        },
+      },
+      {
+        $limit: 20,
+      },
+    ]);
+
+    res.json({
+      tags,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
