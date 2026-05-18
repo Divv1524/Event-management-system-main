@@ -2,7 +2,6 @@ import Event from '../models/Event.js';
 import Registration from '../models/Registration.js';
 import { generateQRCodeDataUrl } from '../utils/qrcode.js';
 import { sendEmail } from '../utils/email.js';
-import path from 'path';
 
 export const registerForEvent = async (req, res) => {
   try {
@@ -34,23 +33,65 @@ export const registerForEvent = async (req, res) => {
     
     const payload = JSON.stringify({ userId: req.user.id, eventId: event._id, at: Date.now() });
     const qrCodeDataUrl = await generateQRCodeDataUrl(payload);
-    const reg = await Registration.create({ user: req.user.id, event: event._id, qrCodeDataUrl });
     
-    try {
-      await sendEmail({ to: req.user.email, subject: `Registered: ${event.title}`, html: `<p>You are registered for ${event.title}.</p>` });
-    } catch (_) { }
+    // Current implementation includes : 
+    // Checks for an existing cancelled registration
+    // Reactivating the existing registration instead of inserting a new record
+    // Capacity validation on event registration
+    // Keeps the audit trail intact while avoiding unique index conflicts
+
+    // Check active registration
+    const activeRegistrations = await Registration.countDocuments({
+      event: req.params.id,
+      status: { $ne: "cancelled" },
+    });
+
+    // Capacity validation
+    if (activeRegistrations>=event.capacity && event.capacity>0){
+      return res.status(400).json({
+        message:"Event is fully booked"
+      })
+    }
+
+    // To reinitiate the existing registered event
+    const existingRegistration = await Registration.findOne({user:req.user.id,event:req.params.id});
+
+    if (existingRegistration){
+      if (existingRegistration.status==="cancelled"){
+          existingRegistration.status = 'registered';
+      }
+
+      await existingRegistration.save();
+      try {
+        await sendEmail({ to: req.user.email, subject: `Registered: ${event.title}`, html: `<p>You are registered for ${event.title}.</p>` });
+      } catch (_) { }
+
+      return res.status(201).json({
+        registration:existingRegistration,
+      })
+    }
+
+    else{
+      const reg = await Registration.create({ user: req.user.id, event: event._id, qrCodeDataUrl });
+      try {
+        await sendEmail({ to: req.user.email, subject: `Registered: ${event.title}`, html: `<p>You are registered for ${event.title}.</p>` });
+      } catch (_) { }
+
+      res.status(201).json({ registration: reg });
+    }
+
     
-    res.status(201).json({ registration: reg });
   } catch (err) {
     console.error('ERROR:', err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// Secure check-in handler with Socket.IO real-time emission (feat/17)
+// Secure check-in handler (from fix/10-checkin-organizer-ownership)
 export const checkInParticipant = async (req, res) => {
   try {
     // Auth context validation
+    // Verify caller is authenticated; auth middleware should populate req.user
     if (!req.user) {
       console.warn('[AUTH] Check-in attempt without auth context');
       return res.status(401).json({ message: 'Unauthorized: user not authenticated' });
@@ -96,26 +137,6 @@ export const checkInParticipant = async (req, res) => {
     );
 
     if (!reg) return res.status(404).json({ message: 'Registration not found for this user/event' });
-
-    // Socket.IO real-time check-in emission (feat/17)
-    try {
-      await reg.populate('user', 'name');
-      const { emitCheckinSuccess } = await import('../services/socket.js');
-      const payload = {
-        registrationId: reg._id,
-        eventId: req.params.id,
-        checkedInAt: reg.checkedInAt,
-        status: reg.status,
-        user: {
-          id: reg.user?._id,
-          name: reg.user?.name || ''
-        }
-      };
-      emitCheckinSuccess(req.params.id, payload);
-    } catch (emitErr) {
-      console.error('[CHECKIN_EMIT] Failed to emit realtime checkin event', emitErr);
-    }
-
     res.json({ registration: reg });
   } catch (err) {
     console.error(`[ERROR] Check-in failed for event ${req.params.id}:`, err.message);
@@ -176,25 +197,43 @@ export const exportParticipantsCsv = async (req, res) => {
     }).populate('user', 'name email');
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=participants-${eventId}.csv`);
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=participants-${eventId}.csv`
+    );
 
     const esc = (value) => {
       if (value === undefined || value === null) {
         return '';
       }
-      const str = typeof value === 'string' ? value : String(value);
+
+      const str =
+        typeof value === 'string'
+          ? value
+          : String(value);
+
       return `"${str.replace(/"/g, '""')}"`;
     };
 
-    res.write(['Name', 'Email', 'Status', 'Registered At'].map(esc).join(',') + '\n');
+    res.write(
+      ['Name', 'Email', 'Status', 'Registered At']
+        .map(esc)
+        .join(',') + '\n'
+    );
 
     for (const registration of registrations) {
       const row = [
         registration.user?.name || '',
         registration.user?.email || '',
         registration.status || '',
-        registration.createdAt ? new Date(registration.createdAt).toISOString() : ''
+        registration.createdAt
+          ? new Date(
+            registration.createdAt
+          ).toISOString()
+          : ''
       ];
+
       res.write(row.map(esc).join(',') + '\n');
     }
 
@@ -204,3 +243,64 @@ export const exportParticipantsCsv = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+
+export const cancelRegistration = async (req, res) => {
+  // Current implementation includes :
+  // Only the customer who owns the registration can cancel it
+  // Cannot cancel if event.date is in the past (past event check)
+  // Sets registration.status = 'cancelled'; does not delete the document (for audit trail)
+  
+  try {
+    const { id } = req.params;
+    const userId = req.user.id; // from auth middleware
+
+    const registration = await Registration.findById(id)
+      .populate("event");
+
+    if (!registration) {
+      return res.status(404).json({
+        message: "Registration not found",
+      });
+    }
+
+    // Owner check
+    if (registration.user.toString() !== userId) {
+      return res.status(403).json({
+        message: "Unauthorized",
+      });
+    }
+
+    // Already cancelled
+    if (registration.status === "cancelled") {
+      return res.status(400).json({
+        message: "Already cancelled",
+      });
+    }
+
+    // Past event check
+    const eventDate = new Date(registration.event.date);
+
+    if (eventDate < new Date()) {
+      return res.status(400).json({
+        message: "Cannot cancel past events",
+      });
+    }
+
+    registration.status = "cancelled";
+    await registration.save();
+
+    res.status(200).json({
+      message: "Registration cancelled successfully",
+      registration,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+
