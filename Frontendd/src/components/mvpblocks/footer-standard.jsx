@@ -27,8 +27,10 @@ const data = () => ({
     ],
 
     resources: [
-      { name: "Documentation", href: "/docs" },
-      { name: "API Reference", href: "/api" },
+      { name: "Documentation", href: "#" },
+      { name: "API Reference", href: "#" },
+      // { name: "Community", href: "/community" },
+      // { name: "Status", href: "/status" },
     ],
 
     legal: [
