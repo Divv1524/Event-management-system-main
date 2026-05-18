@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Ticket, X, Download } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -25,15 +25,7 @@ export default function CustomerDashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedRegistrationId, setSelectedRegistrationId] = useState(null);
 
-    useEffect(() => {
-        if (activeTab === 'Browse Events') {
-            fetchAvailableEvents();
-        } else {
-            fetchRegistrations();
-        }
-    }, [activeTab, searchParams]);
-
-    const fetchAvailableEvents = async () => {
+    const fetchAvailableEvents = useCallback(async () => {
         const tags = searchParams.get('tags');
         try {
             setLoading(true);
@@ -55,9 +47,9 @@ export default function CustomerDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchParams]);
 
-    const fetchRegistrations = async () => {
+    const fetchRegistrations = useCallback(async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
@@ -73,7 +65,15 @@ export default function CustomerDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'Browse Events') {
+            fetchAvailableEvents();
+        } else {
+            fetchRegistrations();
+        }
+    }, [activeTab, searchParams, fetchAvailableEvents, fetchRegistrations]);
 
     const handleRegister = async (eventId) => {
         try {
@@ -406,9 +406,9 @@ const pastEvents = [
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        {evt.tags?.length > 0 && (
+                                                        {reg.event?.tags?.length > 0 && (
                                                             <div className="flex flex-wrap gap-2 mt-3">
-                                                                {evt.tags.map((tag) => (
+                                                                {reg.event?.tags.map((tag) => (
                                                                     <button
                                                                         key={tag}
                                                                         type="button"

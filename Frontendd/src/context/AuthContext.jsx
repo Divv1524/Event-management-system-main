@@ -7,17 +7,6 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        // Check if user is logged in
-        const token = localStorage.getItem('token');
-        if (token) {
-            fetchUser(token);
-        } else {
-            // No token, not loading anymore
-            setLoading(false);
-        }
-    }, []);
-
     const fetchUser = async (token) => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
@@ -40,6 +29,17 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            fetchUser(token);
+        } else {
+            // No token, not loading anymore
+            setLoading(false);
+        }
+    }, []);
 
     const login = (token, userData) => {
         localStorage.setItem('token', token);

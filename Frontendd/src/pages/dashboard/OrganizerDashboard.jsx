@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, MapPin, Users, Plus, Upload, Tag, Search, TrendingUp, IndianRupee, Clock, CheckCircle, XCircle, AlertCircle, Download, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -12,6 +13,7 @@ import { API_BASE_URL } from '../../config';
 
 export default function OrganizerDashboard() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -40,14 +42,7 @@ export default function OrganizerDashboard() {
         byCategory: {}
     });
 
-    useEffect(() => {
-        document.title = 'Organizer Dashboard | Event.One';
-        if (user) {
-            fetchMyEvents();
-        }
-    }, [user, fetchMyEvents]);
-
-    const fetchMyEvents = async () => {
+    const fetchMyEvents = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
 
@@ -70,7 +65,14 @@ export default function OrganizerDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        document.title = 'Organizer Dashboard | Event.One';
+        if (user) {
+            fetchMyEvents();
+        }
+    }, [user, fetchMyEvents]);
 
     const calculateStats = (events) => {
         const newStats = {
