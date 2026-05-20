@@ -4,7 +4,7 @@ const registrationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
-    status: { type: String, enum: ['registered', 'attended', 'cancelled'], default: 'registered' },
+    status: { type: String, enum: ['registered', 'waitlisted' ,  'attended', 'cancelled'], default: 'registered' },
     qrCodeDataUrl: { type: String },
 
     // Payment field that must be added by issue 76 - Feature: Integrate Razorpay Payment Gateway for paid event tickets 
@@ -26,5 +26,3 @@ registrationSchema.index({ user: 1, event: 1 }, { unique: true });
 
 export const Registration = mongoose.model('Registration', registrationSchema);
 export default Registration;
-
-
