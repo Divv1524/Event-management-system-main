@@ -26,7 +26,11 @@ router.post('/:id/checkin', authenticate, authorizeRoles('customer', 'organizer'
 router.get('/:id/participants.csv', authenticate, authorizeRoles('customer', 'organizer', 'admin'), exportParticipantsCsv);
 
 // End point to cancel registration
-router.delete('/:id/cancel', authenticate, cancelRegistration);
+router.delete("/:id/cancel",authenticate,cancelRegistration);
+// End point to check refund status
+router.get("/:id/refund-status",authenticate,checkRefundStatus);
+// End point to check refund policy 
+router.get("/:id/refund-policy",authenticate,checkRefundPolicy)
 
 // End point to cancel registration
 router.delete("/:id/cancel",authenticate,cancelRegistration);
